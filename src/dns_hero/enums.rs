@@ -3,32 +3,6 @@ use strum_macros::{ Display };
 #[derive(Copy, Clone, Display)]
 #[repr(u16)]
 #[allow(dead_code)]
-pub enum ResponseCode {
-    NoError =           0,
-    FormatError =       1,
-    ServerFailure =     2,
-    NXDomain =          3,
-    NotImplemented =    4,
-    Refused =           5,
-    YXDomain =          6,
-    YXRRSet =           7,
-    NXRRSet =           8,
-    NotAuth =           9,
-    NotZone =          10,
-    // 11-15 are unassigned
-    BadOPTVersion =    16,
-    BadKey =           17,
-    BadTime =          18,
-    BadTKEYMode =      19,
-    DuplicateKeyName = 20,
-    BadAlgorithm =     21,
-    BadTruncation =    22,
-    BadCookie =        23,
-}
-
-#[derive(Copy, Clone, Display)]
-#[repr(u16)]
-#[allow(dead_code)]
 pub enum Type {
     A =            1,
     NS =           2,
@@ -147,5 +121,73 @@ impl Class {
         let raw = *self as u16;
         output.push(((raw >> 8) & 0x00FF) as u8);
         output.push((raw & 0x00FF) as u8);
+    }
+}
+
+#[derive(Copy, Clone, Display)]
+#[allow(dead_code)]
+pub enum Opcode {
+    StandardQuery =      0,
+    InverseQuery =       1,
+    ServerStatus =       2,
+    Unassigned =         3,
+    Notify =             4,
+    Update =             5,
+    StatefulOperations = 6,
+    Unknown =            7,
+}
+
+impl Opcode {
+    pub fn from_raw(raw: u8) -> Opcode {
+        match raw {
+            0 => Opcode::StandardQuery,
+            1 => Opcode::InverseQuery,
+            2 => Opcode::ServerStatus,
+            3 => Opcode::Unassigned,
+            4 => Opcode::Notify,
+            5 => Opcode::Update,
+            6 => Opcode::StatefulOperations,
+            _ => Opcode::Unknown,
+        }
+    }
+}
+
+// Note: The spec technically is a 16-bit number with many more values set, but
+// this specifically represents the four-bit rcode field of the DNS header.
+#[derive(Copy, Clone, Display)]
+#[allow(dead_code)]
+pub enum ResponseCode {
+    NoError =    0,
+    FormErr =    1,
+    ServFail =   2,
+    NXDomain =   3,
+    NotImp =     4,
+    Refused =    5,
+    YXDomain =   6,
+    YXRRSet =    7,
+    NXRRSet =    8,
+    NotAuth =    9,
+    NotZone =   10,
+    DSOTYPENI = 11,
+    Unknown =   12,
+}
+
+impl ResponseCode {
+    pub fn from_raw(raw: u8) -> ResponseCode {
+        match raw {
+            0 => ResponseCode::NoError,
+            1 => ResponseCode::FormErr,
+            2 => ResponseCode::ServFail,
+            3 => ResponseCode::NXDomain,
+            4 => ResponseCode::NotImp,
+            5 => ResponseCode::Refused,
+            6 => ResponseCode::YXDomain,
+            7 => ResponseCode::YXRRSet,
+            8 => ResponseCode::NXRRSet,
+            9 => ResponseCode::NotAuth,
+            10 => ResponseCode::NotZone,
+            11 => ResponseCode::DSOTYPENI,
+            _ => ResponseCode::Unknown,
+        }
     }
 }

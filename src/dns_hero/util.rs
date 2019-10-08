@@ -148,3 +148,16 @@ pub fn collect_resources<T>(receiver: &mut Vec<T>, parser: PacketParserFn<T>,
 
     packet_index
 }
+
+pub fn get_flag(byte: u8, index: u8) -> bool {
+    byte & (0x01 << index) != 0
+}
+
+pub fn set_flag(byte: &mut u8, index: u8, value: bool) {
+    let mask = 0x01 << index;
+    if value {
+        *byte |= mask;
+    } else {
+        *byte &= !mask;
+    }
+}

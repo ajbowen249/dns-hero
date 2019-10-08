@@ -108,16 +108,40 @@ impl fmt::Display for Question {
 
 #[derive(Clone)]
 pub struct DecomposedPacket {
-    pub                 id: u16,
-    pub          questions: Vec<Question>,
-    pub            answers: Vec<Resource>,
-    pub        authorities: Vec<Resource>,
-    pub additional_records: Vec<Resource>,
+    pub                  id: u16,
+    pub         is_response: bool,
+    pub              opcode: Opcode,
+    pub    is_authoritative: bool,
+    pub        is_truncated: bool,
+    pub   recursion_desired: bool,
+    pub recursion_available: bool,
+    pub      authentic_data: bool,
+    pub   checking_disabled: bool,
+    pub       response_code: ResponseCode,
+    pub           questions: Vec<Question>,
+    pub             answers: Vec<Resource>,
+    pub         authorities: Vec<Resource>,
+    pub  additional_records: Vec<Resource>,
 }
 
 impl DecomposedPacket {
     pub fn from_packet(raw: &Packet) -> DecomposedPacket {
         let id = raw.get_id();
+
+        let flags_0 = raw.data[2];
+        let is_response = get_flag(flags_0, 7);
+        let raw_opcode = (flags_0 & 0x78) >> 3;
+        let opcode = Opcode::from_raw(raw_opcode);
+        let is_authoritative = get_flag(flags_0, 2);
+        let is_truncated = get_flag(flags_0, 1);
+        let recursion_desired = get_flag(flags_0, 0);
+
+        let flags_1 = raw.data[3];
+        let recursion_available = get_flag(flags_1, 7);
+        let authentic_data = get_flag(flags_1, 5);
+        let checking_disabled = get_flag(flags_1, 4);
+        let response_code = ResponseCode::from_raw(flags_1 & 0x0F);
+
         let mut packet_index = 12; // Start at end of header
 
         let mut questions = Vec::<Question>::new();
@@ -132,17 +156,59 @@ impl DecomposedPacket {
         let mut additional_records = Vec::<Resource>::new();
         collect_resources(&mut additional_records, parse_resource, &raw.data, packet_index, raw.get_additional_record_count());
 
-        DecomposedPacket { id, questions, answers, authorities, additional_records }
+        DecomposedPacket {
+            id,
+            is_response,
+            opcode,
+            is_authoritative,
+            is_truncated,
+            recursion_desired,
+            recursion_available,
+            authentic_data,
+            checking_disabled,
+            response_code,
+            questions,
+            answers,
+            authorities,
+            additional_records
+        }
     }
 
     pub fn new() -> DecomposedPacket {
-        DecomposedPacket { id: 0, questions: vec![], answers: vec![], authorities: vec![], additional_records: vec![] }
+        DecomposedPacket {
+            id: 0,
+            is_response: false,
+            opcode: Opcode::StandardQuery,
+            is_authoritative: false,
+            is_truncated: false,
+            recursion_desired: false,
+            recursion_available: false,
+            authentic_data: false,
+            checking_disabled: false,
+            response_code: ResponseCode::NoError,
+            questions: vec![],
+            answers: vec![],
+            authorities: vec![],
+            additional_records: vec![],
+        }
     }
 
     pub fn to_raw(&self) -> Packet {
         let mut packet = Packet::init();
 
         packet.set_id(self.id);
+
+        set_flag(&mut packet.data[2], 7, self.is_response);
+        packet.data[2] |= (self.opcode as u8 & 0x0F) << 3;
+        set_flag(&mut packet.data[2], 2, self.is_authoritative);
+        set_flag(&mut packet.data[2], 1, self.is_truncated);
+        set_flag(&mut packet.data[2], 0, self.recursion_desired);
+
+        set_flag(&mut packet.data[3], 7, self.recursion_available);
+        set_flag(&mut packet.data[3], 5, self.authentic_data);
+        set_flag(&mut packet.data[3], 4, self.checking_disabled);
+        packet.data[3] |= self.response_code as u8 & 0x0F;
+
         packet.set_question_count(self.questions.len() as u16);
         packet.set_answer_count(self.answers.len() as u16);
         packet.set_authority_count(self.authorities.len() as u16);
@@ -169,8 +235,30 @@ impl DecomposedPacket {
 
 impl fmt::Display for DecomposedPacket {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // IMPROVE: Flags
         coalesce_result!(writeln!(f, "ID: {}", self.id));
+
+        coalesce_result!(
+            writeln!(
+                f,
+                "{} |{}|{}{}{}",
+                if self.is_response { "|Reponse|" } else { "|Query|" },
+                self.opcode,
+                if self.is_authoritative { " |Authoritative|" } else { "" },
+                if self.is_truncated { " |Truncated|" } else { "" },
+                if self.recursion_desired { " |Recursion Desired|" } else { "" },
+            )
+        );
+
+        coalesce_result!(
+            writeln!(
+                f,
+                "{}{}{}|{}|",
+                if self.recursion_available { "|Recursion Available| " } else { "" },
+                if self.authentic_data { "|Authentic Data| " } else { "" },
+                if self.checking_disabled { "|Checking Disabled| " } else { "" },
+                self.response_code,
+            )
+        );
 
         coalesce_result!(writeln!(f, "Questions({}):", self.questions.len()));
         for question in &self.questions {

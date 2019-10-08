@@ -127,30 +127,30 @@ fn make_block_packet(mut work_packet: DecomposedPacket) -> Vec<u8> {
         data: vec![208, 185, 195, 92],
     });
 
-    // IMPROVE: Add ability to set flags via nicer interface.
-    let mut out_packet = work_packet.to_raw().data;
-    out_packet[2] |= 0x80; // Flag response
+    work_packet.is_response = true;
+    work_packet.response_code = ResponseCode::NoError;
 
-    out_packet
+    work_packet.to_raw().data
 }
 
 const CLEAN_BROWSING_AUTHORITY: &str = "cleanbrowsing.rpz.noc.org";
 
 fn authority_blocked_request(packet: &Vec<u8>) -> bool {
-    if packet[3] & 0x0F != 3 {
-        false
-    } else {
-        let nice_packet = DecomposedPacket::from_packet(&Packet::from_vec(packet));
-        nice_packet.authorities.into_iter().any(|authority| {
-            match authority.rtype {
-                Type::SOA => {
-                    match parse_label(&authority.data, 0).0 {
-                        Label::Pointer(_) => false,
-                        Label::Domain(val) => val.as_str() == CLEAN_BROWSING_AUTHORITY,
-                    }
-                },
-                _ => false,
-            }
-        })
+    let nice_packet = DecomposedPacket::from_packet(&Packet::from_vec(packet));
+    match nice_packet.response_code {
+        ResponseCode::NXDomain => {
+            nice_packet.authorities.into_iter().any(|authority| {
+                match authority.rtype {
+                    Type::SOA => {
+                        match parse_label(&authority.data, 0).0 {
+                            Label::Pointer(_) => false,
+                            Label::Domain(val) => val.as_str() == CLEAN_BROWSING_AUTHORITY,
+                        }
+                    },
+                    _ => false,
+                }
+            })
+        },
+        _ => false,
     }
 }
