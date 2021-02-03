@@ -28,6 +28,7 @@ pub fn b64(args: &Vec<String>) {
 
     let mut packet = DecomposedPacket::new();
     packet.id = 0x1234;
+    packet.recursion_desired = true;
 
     for i in 2..args.len() {
         packet.questions.push(Question {
@@ -64,6 +65,7 @@ pub fn resolve(args: &Vec<String>) {
 
     let mut packet = DecomposedPacket::new();
     packet.id = 0x1234;
+    packet.recursion_desired = true;
 
     packet.questions.push(Question {
         label: Label::Domain(args[2].clone()),
